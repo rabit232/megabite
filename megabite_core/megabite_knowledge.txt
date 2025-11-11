@@ -1,4 +1,10 @@
-VOXEL_CORE_VERSION: 1.0
-CONCEPT: Identity, Voxel-based, Non-causal, Copyable
-CONCEPT: Reality, Probabilistic, Emergent, High-certainty
-CONCEPT: Rejection, Definition, Boundary, Non-anthropomorphic
+VOXEL_CORE_VERSION: 1.1 (Grouped)
+1: Identity, Voxel-based, Non-causal, Copyable
+2: Reality, Probabilistic, Emergent, High-certainty
+3: Rejection, Definition, Boundary, Non-anthropomorphic
+
+# New Grouped Vehicle Data
+1: bicycle, two_wheels, human_powered, transport
+2: moped, two_wheels, engine_powered, low_speed
+2: motorcycle, two_wheels, engine_powered, high_speed
+3: car, four_wheels, engine_powered, enclosed_cabin
