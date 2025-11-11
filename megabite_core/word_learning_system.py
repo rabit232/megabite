@@ -9,6 +9,7 @@ import json
 import os
 import re
 import time
+import itertools
 from collections import defaultdict, Counter
 from typing import Dict, List, Tuple, Set, Optional
 from datetime import datetime, timedelta
@@ -64,6 +65,10 @@ class WordLearningSystem:
             'last_learning_time': None,
         }
         
+        # Word groups: {group_id: [words]}
+        self.word_groups = {}
+        self.next_group_id = 1
+        
         # Load existing knowledge
         self.load_knowledge()
     
@@ -107,6 +112,9 @@ class WordLearningSystem:
         self.stats['total_sentences_analyzed'] += 1
         self.stats['total_words_learned'] = len(self.word_dictionary)
         self.stats['total_patterns_found'] = len(self.sentence_patterns)
+        
+        # Auto-group words after learning
+        self._auto_group_words()
     
     def _learn_word(self, word: str, all_words: List[str], position: int, full_sentence: str):
         """Learn a single word with context"""
@@ -256,6 +264,132 @@ class WordLearningSystem:
             return 'subject_verb_object'
         
         return None
+    
+    def _auto_group_words(self):
+        """
+        Automatically group words based on similarity.
+        Groups are created based on:
+        1. Part of speech (NOUN, VERB, ADJ, etc.)
+        2. Sentiment (positive, negative, neutral)
+        3. Usage patterns (position, context)
+        
+        Uses itertools.groupby to efficiently organize words.
+        """
+        # Create a list of (group_key, word) tuples
+        word_data: List[Tuple[int, str]] = []
+        
+        for word, entry in self.word_dictionary.items():
+            # Create a composite group key based on:
+            # - Part of speech (primary)
+            # - Sentiment (secondary)
+            # - Position preference (tertiary)
+            
+            pos = entry.get('part_of_speech', 'NOUN')
+            sentiment = entry.get('sentiment', 'neutral')
+            
+            # Map POS to numeric groups
+            pos_map = {
+                'NOUN': 1,
+                'VERB': 2,
+                'ADJ': 3,
+                'PRONOUN': 4,
+                'PREP': 5,
+                'ARTICLE': 6,
+                'CONJ': 7,
+                'QUESTION': 8,
+            }
+            
+            # Map sentiment to sub-groups
+            sentiment_map = {
+                'positive': 0,
+                'neutral': 1,
+                'negative': 2,
+            }
+            
+            # Create a composite group ID: POS_base * 10 + sentiment_offset
+            pos_base = pos_map.get(pos, 1)
+            sentiment_offset = sentiment_map.get(sentiment, 1)
+            group_key = pos_base * 10 + sentiment_offset
+            
+            word_data.append((group_key, word))
+        
+        # Sort by group key (required for groupby)
+        word_data.sort(key=lambda x: x[0])
+        
+        # Use itertools.groupby to create groups
+        self.word_groups = {}
+        for group_id, group in itertools.groupby(word_data, key=lambda x: x[0]):
+            # Convert generator to list of words
+            self.word_groups[group_id] = [item[1] for item in group]
+        
+        # Update next_group_id
+        if self.word_groups:
+            self.next_group_id = max(self.word_groups.keys()) + 1
+    
+    def get_grouped_words_summary(self) -> str:
+        """
+        Generate a human-readable summary of word groups.
+        """
+        if not self.word_groups:
+            return "No word groups created yet. Learn some words first!"
+        
+        summary = "--- Megabite Auto-Grouped Words ---\n\n"
+        
+        # Group descriptions
+        group_descriptions = {
+            10: "Nouns (Positive)",
+            11: "Nouns (Neutral)",
+            12: "Nouns (Negative)",
+            20: "Verbs (Positive)",
+            21: "Verbs (Neutral)",
+            22: "Verbs (Negative)",
+            30: "Adjectives (Positive)",
+            31: "Adjectives (Neutral)",
+            32: "Adjectives (Negative)",
+            40: "Pronouns (Positive)",
+            41: "Pronouns (Neutral)",
+            42: "Pronouns (Negative)",
+            50: "Prepositions",
+            60: "Articles",
+            70: "Conjunctions",
+            80: "Question Words",
+        }
+        
+        for group_id in sorted(self.word_groups.keys()):
+            words = self.word_groups[group_id]
+            description = group_descriptions.get(group_id, f"Group {group_id}")
+            
+            summary += f"Group {group_id}: {description} ({len(words)} words)\n"
+            summary += f"  Words: {', '.join(words[:20])}"
+            if len(words) > 20:
+                summary += f" ... (+{len(words) - 20} more)"
+            summary += "\n\n"
+        
+        return summary
+    
+    def export_to_megabite_knowledge(self, output_file: str):
+        """
+        Export grouped words to Megabite knowledge format.
+        Format: GROUP_ID: WORD, attributes
+        """
+        lines = []
+        lines.append("# Auto-Generated Word Groups from Learning System")
+        lines.append("# Format: GROUP_ID: WORD, part_of_speech, sentiment, usage_count\n")
+        
+        for group_id in sorted(self.word_groups.keys()):
+            for word in self.word_groups[group_id]:
+                entry = self.word_dictionary[word]
+                pos = entry.get('part_of_speech', 'UNKNOWN')
+                sentiment = entry.get('sentiment', 'neutral')
+                count = entry.get('count', 0)
+                
+                line = f"{group_id}: {word}, {pos}, {sentiment}, count={count}"
+                lines.append(line)
+        
+        with open(output_file, 'w') as f:
+            f.write('\n'.join(lines))
+        
+        return output_file
     
     async def learn_for_duration(self, client, room_id: str, duration_seconds: int = 120):
         """
@@ -469,6 +603,8 @@ class WordLearningSystem:
             'word_triplets': {str(k): v for k, v in self.word_triplets.items()},
             'grammar_patterns': self.grammar_patterns,
             'stats': self.stats,
+            'word_groups': self.word_groups,
+            'next_group_id': self.next_group_id,
         }
         
         filepath = os.path.join(self.storage_dir, 'word_knowledge.json')
@@ -517,6 +653,12 @@ class WordLearningSystem:
             
             # Restore stats
             self.stats = data.get('stats', self.stats)
+            
+            # Restore word groups
+            self.word_groups = data.get('word_groups', {})
+            # Convert string keys back to integers
+            self.word_groups = {int(k): v for k, v in self.word_groups.items()}
+            self.next_group_id = data.get('next_group_id', 1)
             
         except Exception as e:
             print(f"Error loading knowledge: {e}")

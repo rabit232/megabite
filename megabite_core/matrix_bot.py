@@ -736,7 +736,14 @@ I am Ribit 2.0, an elegant AI agent with sophisticated reasoning capabilities. H
             # Run the learning process
             summary = await self.word_learner.learn_for_duration(self.client, room_id, duration_seconds)
             
-            return f"✅ Word learning session complete!\n\n{summary}"
+            # Get auto-grouped words summary
+            grouped_summary = self.word_learner.get_grouped_words_summary()
+            
+            # Export to Megabite knowledge format
+            export_path = os.path.join(os.path.dirname(__file__), "learned_words_grouped.txt")
+            self.word_learner.export_to_megabite_knowledge(export_path)
+            
+            return f"✅ Word learning session complete!\n\n{summary}\n\n{grouped_summary}\n\n📝 Grouped words exported to: {export_path}"
         
         except Exception as e:
             logger.error(f"Error handling ?learn_words: {e}")

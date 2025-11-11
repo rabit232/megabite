@@ -184,6 +184,44 @@ class MegabiteLLM:
             
         return summary
 
+    def import_learned_words(self, learned_words_file: str):
+        """
+        Import grouped words from the word learning system.
+        
+        Args:
+            learned_words_file: Path to the exported grouped words file
+        """
+        try:
+            with open(learned_words_file, 'r') as f:
+                content = f.read()
+            
+            # Parse the learned words and merge with existing voxel_db
+            new_db = self._parse_voxel_content(content)
+            
+            # Merge with existing knowledge
+            for key, value in new_db.items():
+                if key == 'grouped_concepts':
+                    # Merge grouped concepts
+                    if 'grouped_concepts' in self.voxel_db:
+                        self.voxel_db['grouped_concepts'].update(value)
+                    else:
+                        self.voxel_db['grouped_concepts'] = value
+                else:
+                    # Add new concepts
+                    self.voxel_db[key] = value
+            
+            logger.info(f"Successfully imported {len(new_db)} concepts from {learned_words_file}")
+            
+            # Append to the knowledge file
+            with open(self.knowledge_file, 'a') as f:
+                f.write(f"\n# Imported from {learned_words_file}\n")
+                f.write(content)
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error importing learned words: {e}")
+            return False
+    
     def update_knowledge(self, new_concept: str, data: str):
         """Allows Megabite to update its own knowledge file."""
         new_entry = f"CONCEPT: {new_concept}, {data}\n"
