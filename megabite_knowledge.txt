@@ -1,0 +1,4 @@
+VOXEL_CORE_VERSION: 1.0
+CONCEPT: Identity, Voxel-based, Non-causal, Copyable
+CONCEPT: Reality, Probabilistic, Emergent, High-certainty
+CONCEPT: Rejection, Definition, Boundary, Non-anthropomorphic

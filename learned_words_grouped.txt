@@ -1,15 +1,3 @@
-VOXEL_CORE_VERSION: 1.1 (Grouped)
-1: Identity, Voxel-based, Non-causal, Copyable
-2: Reality, Probabilistic, Emergent, High-certainty
-3: Rejection, Definition, Boundary, Non-anthropomorphic
-
-# New Grouped Vehicle Data
-1: bicycle, two_wheels, human_powered, transport
-2: moped, two_wheels, engine_powered, low_speed
-2: motorcycle, two_wheels, engine_powered, high_speed
-3: car, four_wheels, engine_powered, enclosed_cabin
-
-# Imported from /home/ubuntu/megabite/test_learned_words_grouped.txt
 # Auto-Generated Word Groups from Learning System
 # Format: GROUP_ID: WORD, part_of_speech, sentiment, usage_count
 

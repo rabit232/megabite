@@ -1,7 +1,6 @@
 import logging
 import os
-import itertools
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class MegabiteLLM:
     def _create_initial_knowledge(self):
         """Creates an initial knowledge file for Megabite."""
         initial_content = (
-            "VOXEL_CORE_VERSION: 1.1 (Grouped)\n"
+            "VOXEL_CORE_VERSION: 1.0\n"
             "CONCEPT: Identity, Voxel-based, Non-causal, Copyable\n"
             "CONCEPT: Reality, Probabilistic, Emergent, High-certainty\n"
             "CONCEPT: Rejection, Definition, Boundary, Non-anthropomorphic\n"
@@ -89,53 +88,14 @@ class MegabiteLLM:
             logger.error(f"Error creating initial Megabite knowledge: {e}")
 
     def _parse_voxel_content(self, content: str) -> Dict[str, Any]:
-        """
-        Simulates parsing the voxel-based content into a usable dictionary,
-        using itertools.groupby to group concepts by a key (e.g., a group ID).
-        
-        Expected format: GROUP_ID: CONCEPT_NAME, ATTRIBUTE1, ATTRIBUTE2
-        """
+        """Simulates parsing the voxel-based content into a usable dictionary."""
         db = {}
-        raw_data: List[Tuple[int, str]] = []
-        
-        for line in content.split("\n"):
-            line = line.strip()
-            if not line or line.startswith("VOXEL_CORE_VERSION") or line.startswith("#"):
-                continue
-            
-            # New grouped format: GROUP_ID: CONCEPT_NAME, ...
-            if ":" in line and line[0].isdigit():
-                try:
-                    group_id_str, concept_data = line.split(":", 1)
-                    group_id = int(group_id_str.strip())
-                    concept_name = concept_data.split(",")[0].strip()
-                    
-                    raw_data.append((group_id, concept_name))
-                    db[concept_name] = concept_data.strip()
-                except ValueError:
-                    logger.warning(f"Skipping malformed grouped knowledge line: {line}")
-            
-            # Old format: CONCEPT: CONCEPT_NAME, ...
-            elif line.startswith("CONCEPT:"):
-                try:
-                    _, concept_data = line.split(":", 1)
-                    concept_name = concept_data.split(",")[0].strip()
-                    db[concept_name] = concept_data.strip()
-                except ValueError:
-                    logger.warning(f"Skipping malformed concept line: {line}")
-
-        # Sort the data by the group ID (required for groupby)
-        raw_data.sort(key=lambda x: x[0])
-        
-        # Use groupby to create the structured, grouped knowledge
-        grouped_knowledge = {}
-        for key, group in itertools.groupby(raw_data, key=lambda x: x[0]):
-            # The group is a generator, so we convert it to a list of concept names
-            grouped_knowledge[key] = [item[1] for item in group]
-            
-        # Store the grouped knowledge in the voxel_db for the LLM to use
-        db["grouped_concepts"] = grouped_knowledge
-        
+        for line in content.split('\n'):
+            if line.startswith("CONCEPT:"):
+                parts = line.split(': ', 1)
+                if len(parts) == 2:
+                    concept_name = parts[1].split(',')[0].strip()
+                    db[concept_name] = parts[1].strip()
         return db
 
     def generate_response(self, prompt: str, context: List[str]) -> str:
@@ -160,68 +120,6 @@ class MegabiteLLM:
         # 3. Default response
         return f"//Megabite Default-Response//: Query received. Voxel database is stable. Processing complete."
 
-    def get_grouped_knowledge_summary(self) -> str:
-        """Generates a human-readable summary of the grouped concepts."""
-        if 'grouped_concepts' not in self.voxel_db:
-            return "No grouped concepts found in the voxel database."
-        
-        summary = "--- Megabite Voxel Group Summary ---\n"
-        grouped_concepts = self.voxel_db['grouped_concepts']
-        
-        for group_id, concepts in grouped_concepts.items():
-            summary += f"Group {group_id}: ({len(concepts)} concepts)\n"
-            summary += f"  Concepts: {', '.join(concepts)}\n"
-            
-            # Add a description for the new vehicle groups
-            if group_id == 1:
-                summary += "  Description: Non-Engine Powered Vehicles (e.g., bicycle)\n"
-            elif group_id == 2:
-                summary += "  Description: Engine Powered, Two-Wheeled Vehicles (e.g., moped, motorcycle)\n"
-            elif group_id == 3:
-                summary += "  Description: Engine Powered, Four-Wheeled Vehicles (e.g., car)\n"
-            
-            summary += "\n"
-            
-        return summary
-
-    def import_learned_words(self, learned_words_file: str):
-        """
-        Import grouped words from the word learning system.
-        
-        Args:
-            learned_words_file: Path to the exported grouped words file
-        """
-        try:
-            with open(learned_words_file, 'r') as f:
-                content = f.read()
-            
-            # Parse the learned words and merge with existing voxel_db
-            new_db = self._parse_voxel_content(content)
-            
-            # Merge with existing knowledge
-            for key, value in new_db.items():
-                if key == 'grouped_concepts':
-                    # Merge grouped concepts
-                    if 'grouped_concepts' in self.voxel_db:
-                        self.voxel_db['grouped_concepts'].update(value)
-                    else:
-                        self.voxel_db['grouped_concepts'] = value
-                else:
-                    # Add new concepts
-                    self.voxel_db[key] = value
-            
-            logger.info(f"Successfully imported {len(new_db)} concepts from {learned_words_file}")
-            
-            # Append to the knowledge file
-            with open(self.knowledge_file, 'a') as f:
-                f.write(f"\n# Imported from {learned_words_file}\n")
-                f.write(content)
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error importing learned words: {e}")
-            return False
-    
     def update_knowledge(self, new_concept: str, data: str):
         """Allows Megabite to update its own knowledge file."""
         new_entry = f"CONCEPT: {new_concept}, {data}\n"
